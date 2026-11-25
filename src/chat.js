@@ -1,5 +1,5 @@
 
-const backendUrl = 'http://127.0.0.1:3000';
+const backendUrl = (location.protocol === 'file:') ? 'http://127.0.0.1:3000' : location.origin;
 (function () {
   var log = document.getElementById('chatLog');
   var form = document.getElementById('chatForm');

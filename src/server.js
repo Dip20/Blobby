@@ -7,7 +7,7 @@ import app from './app.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 3000);
 
-app.use(express.static(__dirname, { index: 'index.html' }));
+app.use(express.static(path.join(__dirname, '../public'), { index: 'index.html' }));
 
 app.listen(PORT, () => {
   console.log(`Blobby is running at http://localhost:${PORT}`);

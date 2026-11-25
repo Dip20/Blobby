@@ -34,10 +34,14 @@ Blobby is a cute, expressive 3D blob AI companion. It lives in your browser as a
 ## Project Structure
 
 ```
-├── src/
+├── public/
 │   ├── index.html    # Frontend: 3D avatar scene, chat UI, styles
-│   ├── chat.js       # Frontend: chat client, voice input, session handling
-│   └── server.js     # Backend: Express API, LangChain chain, prompt
+│   └── chat.js       # Frontend: chat client, voice input, session handling
+├── src/
+│   ├── app.js        # Express app: routes, LangChain chain, prompt
+│   └── server.js     # Local dev server (static files + listen)
+├── api/
+│   └── index.js      # Vercel serverless function wrapping the Express app
 ├── .env.example    # Environment variable template
 └── package.json
 ```

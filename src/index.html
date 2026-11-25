@@ -1,0 +1,1431 @@
+<!doctype html>
+<html>
+
+  <head>
+    <meta charset=utf8>
+    <meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover">
+    <style>
+      :root {
+        color-scheme: light;
+        box-sizing: border-box;
+        padding-top: env(safe-area-inset-top, 0px);
+        padding-bottom: env(safe-area-inset-bottom, 0px)
+      }
+
+      html {
+        scroll-padding-top: env(safe-area-inset-top, 0px)
+      }
+
+      body {
+        margin: 0;
+        padding: 0;
+        font: 14px -apple-system, BlinkMacSystemFont, sans-serif;
+        background: #fff;
+        color: #000
+      }
+
+      img {
+        max-width: 100%
+      }
+
+      [hidden]:not([hidden=until-found i]) {
+        display: none !important
+      }
+    </style>
+  </head>
+
+  <body>
+    <title>Blobby</title>
+    <meta name="claude:viewport-fit-sides" content="cover">
+    <link rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap">
+    <style>
+      /* Layout: center stage plus side chat on wide screens. */
+      :root {
+        --bg: #EEF1F8;
+        --surface: #FFFFFF;
+        --fg: #1B2233;
+        --muted: #5D6880;
+        --line: #D6DCEA;
+        --accent: #3B82F6;
+        --accent-fg: #FFFFFF;
+        --chip: #F3F5FB;
+        --stage-hi: #F7F9FF;
+        --stage-lo: #D9E2F6;
+        --panel-h: clamp(340px, 60vh, 560px);
+        --font-display: "Space Grotesk", system-ui, sans-serif;
+        --font-body: Inter, system-ui, sans-serif;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme="light"]) {
+          --bg: #11151F;
+          --surface: #1A2030;
+          --fg: #E8ECF6;
+          --muted: #98A3BC;
+          --line: #2A3248;
+          --accent: #60A5FA;
+          --accent-fg: #0B2545;
+          --chip: #202739;
+          --stage-hi: #252D45;
+          --stage-lo: #171C2B;
+          color-scheme: dark;
+        }
+      }
+
+      :root[data-theme="dark"] {
+        --bg: #11151F;
+        --surface: #1A2030;
+        --fg: #E8ECF6;
+        --muted: #98A3BC;
+        --line: #2A3248;
+        --accent: #60A5FA;
+        --accent-fg: #0B2545;
+        --chip: #202739;
+        --stage-hi: #252D45;
+        --stage-lo: #171C2B;
+        color-scheme: dark;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        background: var(--bg);
+        color: var(--fg);
+        font-family: var(--font-body);
+        font-size: 15px;
+        line-height: 1.5;
+        padding-block: 28px 36px;
+        padding-left: max(16px, env(safe-area-inset-left, 0px));
+        padding-right: max(16px, env(safe-area-inset-right, 0px));
+      }
+
+      .wrap {
+        max-width: 1200px;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(360px, 480px);
+        gap: 18px;
+        align-items: start;
+      }
+
+      .center {
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+        min-width: 0;
+      }
+
+      .app-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .app-head h1 {
+        display: flex;
+        align-items: center;
+      }
+
+      h1 {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: clamp(30px, 6vw, 42px);
+        line-height: 1.05;
+        margin: 0;
+        letter-spacing: -0.01em;
+      }
+
+      .sub {
+        margin: 6px 0 0;
+        color: var(--muted);
+        max-width: 52ch;
+      }
+
+      .stage {
+        position: relative;
+        width: 100%;
+        height: var(--panel-h);
+        border-radius: 22px;
+        overflow: hidden;
+        background: radial-gradient(120% 90% at 50% 30%, var(--stage-hi), var(--stage-lo));
+        border: 1px solid var(--line);
+        touch-action: manipulation;
+        cursor: pointer;
+      }
+
+      .stage canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+
+      .nogl {
+        margin: 0;
+        padding: 32px;
+        color: var(--muted);
+      }
+
+      .bubble {
+        position: absolute;
+        top: 14px;
+        left: 50%;
+        transform: translateX(-50%);
+        max-width: min(86%, 440px);
+        padding: 10px 16px;
+        background: var(--surface);
+        color: var(--fg);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        text-align: center;
+        font-weight: 500;
+        opacity: 0;
+        transition: opacity .25s ease;
+        pointer-events: none;
+      }
+
+      .bubble.show {
+        opacity: 1;
+      }
+
+      .panel {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+
+      .label {
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      button,
+      input[type="text"],
+      select,
+      textarea {
+        font: inherit;
+        color: inherit;
+      }
+
+      .ghost,
+      .primary {
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: var(--chip);
+        padding: 7px 14px;
+        cursor: pointer;
+        font-weight: 500;
+      }
+
+      .primary {
+        background: var(--accent);
+        color: var(--accent-fg);
+        border-color: var(--accent);
+        font-weight: 600;
+      }
+
+      .ghost:hover {
+        border-color: var(--accent);
+      }
+
+      .primary:hover {
+        filter: brightness(1.06);
+      }
+
+      .icon-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        border: 1px solid var(--line);
+        background: var(--chip);
+        color: var(--muted);
+        cursor: pointer;
+        padding: 0;
+        vertical-align: middle;
+        margin-left: 10px;
+      }
+
+      .icon-btn:hover {
+        color: var(--fg);
+        border-color: var(--accent);
+      }
+
+      .icon-btn svg {
+        width: 16px;
+        height: 16px;
+      }
+
+      .toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        color: var(--fg);
+        font-size: 14px;
+      }
+
+      .hint {
+        margin: 0;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .chat-panel {
+        position: sticky;
+        top: 18px;
+        height: var(--panel-h);
+        max-height: calc(100vh - 36px);
+        gap: 12px;
+      }
+
+      .chat-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      .chat-title {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 18px;
+      }
+
+      .chat-sub {
+        margin-top: 2px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .chat-clear {
+        flex: none;
+        padding: 6px 12px;
+        font-size: 13px;
+      }
+
+      .chat-log {
+        flex: 1;
+        min-height: 180px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        padding-right: 4px;
+      }
+
+      .msg {
+        max-width: 88%;
+        padding: 9px 12px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+      }
+
+      .msg p {
+        margin: 0;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+
+      .msg.user {
+        align-self: flex-end;
+        background: var(--accent);
+        color: var(--accent-fg);
+        border-color: var(--accent);
+      }
+
+      .msg.bot {
+        align-self: flex-start;
+        background: var(--chip);
+      }
+
+      .typing {
+        display: inline-flex;
+        gap: 4px;
+        padding: 2px 0;
+      }
+
+      .typing span {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--muted);
+        animation: chat-blink 1s infinite ease-in-out;
+      }
+
+      .typing span:nth-child(2) {
+        animation-delay: .15s;
+      }
+
+      .typing span:nth-child(3) {
+        animation-delay: .3s;
+      }
+
+      @keyframes chat-blink {
+        0%, 80%, 100% {
+          opacity: .25;
+          transform: translateY(0);
+        }
+        40% {
+          opacity: 1;
+          transform: translateY(-2px);
+        }
+      }
+
+      .suggestions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .suggestions[hidden] {
+        display: none;
+      }
+
+      .suggest {
+        font-size: 12px;
+        padding: 5px 11px;
+      }
+
+      .chat-form {
+        display: flex;
+        gap: 8px;
+      }
+
+      .chat-form input {
+        flex: 1;
+        min-width: 0;
+        background: var(--chip);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 9px 12px;
+      }
+
+      .chat-note {
+        font-size: 12px;
+      }
+
+      .chat-note code {
+        background: var(--chip);
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 1px 5px;
+      }
+
+      :focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+
+      @media (max-width: 960px) {
+        .layout {
+          grid-template-columns: 1fr;
+        }
+
+        .center {
+          width: 100%;
+          max-width: 760px;
+          margin: 0 auto;
+        }
+
+        .chat-panel {
+          position: static;
+          height: auto;
+          max-height: none;
+        }
+      }
+
+      /* ---------- settings modal ---------- */
+      .modal {
+        position: fixed;
+        inset: 0;
+        background: rgba(17, 21, 31, 0.45);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 18px;
+        z-index: 50;
+      }
+
+      .modal[hidden] {
+        display: none;
+      }
+
+      .modal-card {
+        width: min(440px, 100%);
+        max-height: calc(100vh - 36px);
+        overflow-y: auto;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        padding: 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        box-shadow: 0 18px 48px rgba(17, 21, 31, 0.28);
+      }
+
+      .modal-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      .modal-head h2 {
+        margin: 0;
+        font-family: var(--font-display);
+        font-size: 18px;
+      }
+
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .field input[type="text"],
+      .field select,
+      .field textarea {
+        width: 100%;
+        background: var(--chip);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 9px 12px;
+        resize: vertical;
+      }
+
+      .field input[type="color"] {
+        width: 56px;
+        height: 40px;
+        padding: 2px;
+        background: var(--chip);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        cursor: pointer;
+      }
+
+      .modal-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+      }
+
+      .chat-voice {
+        flex: none;
+        border-radius: 12px;
+        position: relative;
+      }
+
+      .chat-voice.on {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: var(--accent-fg);
+        animation: voice-pulse 1.6s ease-in-out infinite;
+      }
+
+      .chat-voice.on::after {
+        content: "";
+        position: absolute;
+        inset: -5px;
+        border-radius: 17px;
+        padding: 3px;
+        background: conic-gradient(var(--accent), #A3C1FF, var(--accent));
+        -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+        -webkit-mask-composite: xor;
+        mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+        mask-composite: exclude;
+        animation: voice-spin 2.6s linear infinite;
+        pointer-events: none;
+      }
+
+      @keyframes voice-spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      .voice-wave {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 3px;
+        height: 30px;
+      }
+
+      .voice-wave[hidden] {
+        display: none;
+      }
+
+      .voice-wave i {
+        width: 3px;
+        height: 4px;
+        border-radius: 2px;
+        background: var(--accent);
+        transition: height .09s ease, opacity .09s ease;
+      }
+
+      /* ---------- voice mode overlay ---------- */
+      .voice-overlay {
+        position: fixed;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: min(52vw, 560px);
+        z-index: 60;
+        background:
+          radial-gradient(90% 50% at 50% 100%, rgba(59, 130, 246, 0.12), transparent 65%),
+          var(--surface);
+        border-left: 1px solid var(--line);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 22px;
+        padding: 24px;
+        animation: voice-slide-in .35s cubic-bezier(.2, .9, .3, 1);
+      }
+
+      @keyframes voice-slide-in {
+        from {
+          transform: translateX(40px);
+          opacity: 0;
+        }
+
+        to {
+          transform: translateX(0);
+          opacity: 1;
+        }
+      }
+
+      @media (max-width: 760px) {
+        .orb-wrap {
+          height: min(30vh, 220px);
+        }
+
+        .voice-overlay {
+          top: auto;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          width: 100%;
+          height: 58%;
+          border-left: none;
+          border-top: 1px solid var(--line);
+          border-radius: 22px 22px 0 0;
+          animation-name: voice-slide-up;
+        }
+
+        @keyframes voice-slide-up {
+          from {
+            transform: translateY(40px);
+            opacity: 0;
+          }
+
+          to {
+            transform: translateY(0);
+            opacity: 1;
+          }
+        }
+      }
+
+      .voice-overlay[hidden] {
+        display: none;
+      }
+
+      .voice-end {
+        position: absolute;
+        top: max(18px, env(safe-area-inset-top, 0px));
+        right: max(18px, env(safe-area-inset-right, 0px));
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        border: 1px solid var(--line);
+        background: var(--surface);
+        color: var(--fg);
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .voice-end:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+
+      .voice-end svg {
+        width: 18px;
+        height: 18px;
+      }
+
+      .orb-wrap {
+        position: relative;
+        height: min(46vh, 320px);
+        aspect-ratio: 1;
+        flex: none;
+        animation: orb-float 7s ease-in-out infinite;
+      }
+
+      .orb-glow {
+        position: absolute;
+        inset: -18%;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(147, 180, 255, 0.45), rgba(59, 130, 246, 0.15) 55%, transparent 72%);
+        filter: blur(28px);
+        opacity: calc(0.45 + var(--lvl, 0) * 0.55);
+        transform: scale(calc(0.9 + var(--lvl, 0) * 0.45));
+        transition: opacity .18s ease, transform .12s ease-out;
+      }
+
+      .orb-core {
+        position: absolute;
+        inset: 0;
+        border-radius: 50%;
+        background:
+          radial-gradient(circle at 34% 28%, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0) 32%),
+          linear-gradient(155deg, #A3C1FF 0%, #3B82F6 52%, #1E40AF 100%);
+        animation: orb-morph 9s ease-in-out infinite;
+        box-shadow:
+          inset 0 -18px 40px rgba(20, 16, 60, 0.35),
+          inset 0 10px 30px rgba(255, 255, 255, 0.25);
+      }
+
+      @keyframes orb-float {
+        0%, 100% {
+          transform: translateY(-8px);
+        }
+
+        50% {
+          transform: translateY(8px);
+        }
+      }
+
+      @keyframes orb-morph {
+        0%, 100% {
+          border-radius: 50% 50% 50% 50% / 52% 48% 55% 45%;
+        }
+
+        33% {
+          border-radius: 46% 54% 52% 48% / 55% 45% 52% 48%;
+        }
+
+        66% {
+          border-radius: 52% 48% 46% 54% / 48% 55% 45% 52%;
+        }
+      }
+
+      .voice-overlay .voice-wave {
+        height: 44px;
+        gap: 4px;
+      }
+
+      .voice-overlay .voice-wave i {
+        width: 4px;
+        border-radius: 3px;
+        background: var(--accent);
+      }
+
+      .voice-status {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 20px;
+        letter-spacing: 0.01em;
+      }
+
+      .voice-heard {
+        min-height: 24px;
+        max-width: 100%;
+        text-align: center;
+        color: var(--muted);
+        font-size: 15px;
+      }
+
+      .voice-heard.interim {
+        opacity: 0.65;
+        font-style: italic;
+      }
+
+      @keyframes voice-pulse {
+        0%, 100% {
+          box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.35);
+        }
+
+        50% {
+          box-shadow: 0 0 0 6px rgba(59, 130, 246, 0);
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .bubble {
+          transition: none;
+        }
+
+        .chat-voice.on {
+          animation: none;
+        }
+
+        .chat-voice.on::after {
+          animation: none;
+        }
+
+        .orb-wrap,
+        .orb-core {
+          animation: none;
+        }
+
+        .voice-overlay {
+          animation: none;
+        }
+      }
+    </style>
+
+    <main class="wrap">
+      <header class="app-head">
+        <div>
+          <h1><span id="appName">Blobby</span><button id="editName" class="icon-btn" type="button"
+              aria-label="Rename" title="Rename">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+              </svg>
+            </button></h1>
+          <p class="sub">A small 3D avatar that follows your pointer and chats with a moving mouth.</p>
+        </div>
+        <button id="settingsBtn" class="icon-btn" type="button" aria-label="Settings" title="Settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="3" />
+            <path
+              d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+          </svg>
+        </button>
+      </header>
+
+      <div class="layout">
+        <div class="center">
+          <section id="stage" class="stage" aria-label="Blobby, a cartoon avatar. Tap to poke.">
+            <div id="bubble" class="bubble" role="status" aria-live="polite"></div>
+          </section>
+
+          <p class="hint">Move your pointer and he follows. Tap him to poke.</p>
+        </div>
+
+        <aside class="panel chat-panel" aria-label="Chat">
+          <div class="chat-head">
+            <div>
+              <div class="chat-title" id="chatTitle">Chat with Blobby</div>
+            </div>
+            <button id="chatClear" class="ghost chat-clear" type="button">Clear</button>
+          </div>
+          <div id="suggestions" class="suggestions"></div>
+          <div id="chatLog" class="chat-log" aria-live="polite"></div>
+          <form id="chatForm" class="chat-form">
+            <button id="voiceBtn" class="icon-btn chat-voice" type="button" aria-label="Start voice chat"
+              aria-pressed="false" title="Voice chat">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                <path d="M12 19v3" />
+              </svg>
+            </button>
+            <input id="chatInput" type="text" maxlength="500" placeholder="Say something to Blobby..."
+              autocomplete="off" required>
+            <button id="chatSend" class="primary" type="submit">Send</button>
+          </form>
+        </aside>
+      </div>
+    </main>
+
+    <div id="voiceOverlay" class="voice-overlay" hidden>
+      <button id="voiceEnd" class="voice-end" type="button" aria-label="End voice chat" title="End voice chat">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7 2 2 0 0 1 1.72 2v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.42 19.42 0 0 1-3.33-2.67m-2.67-3.34a19.79 19.79 0 0 1-3.07-8.63A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91" />
+          <line x1="23" y1="1" x2="1" y2="23" />
+        </svg>
+      </button>
+
+      <div class="orb-wrap">
+        <div class="orb-glow"></div>
+        <div class="orb-core"></div>
+      </div>
+
+      <div id="voiceWave" class="voice-wave" aria-hidden="true"></div>
+      <div id="voiceStatus" class="voice-status">Listening…</div>
+      <div id="voiceHeard" class="voice-heard"></div>
+    </div>
+
+    <div id="settingsModal" class="modal" hidden>
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+        <div class="modal-head">
+          <h2 id="settingsTitle">Settings</h2>
+          <button id="settingsClose" class="icon-btn" type="button" aria-label="Close settings">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M18 6 6 18M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <label class="field">
+          <span class="label">Name</span>
+          <input id="setName" type="text" maxlength="24" autocomplete="off">
+        </label>
+
+        <label class="field">
+          <span class="label">Avatar color</span>
+          <input id="setColor" type="color">
+        </label>
+
+        <label class="field">
+          <span class="label">Default mood</span>
+          <select id="setMood"></select>
+        </label>
+
+        <label class="field">
+          <span class="toggle"><input id="setVoice" type="checkbox"> Speak replies aloud</span>
+        </label>
+
+        <label class="field">
+          <span class="label">Custom personality</span>
+          <textarea id="setPrompt" rows="4" maxlength="1000"
+            placeholder="Optional. e.g. You are a witty pirate who loves space facts."></textarea>
+        </label>
+
+        <div class="modal-actions">
+          <button id="settingsReset" class="ghost" type="button">Reset</button>
+          <button id="settingsSave" class="primary" type="button">Save</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+      (function () {
+        var stage = document.getElementById('stage');
+        var bubble = document.getElementById('bubble');
+
+        var SETTINGS_KEY = 'blobby.settings';
+        var DEFAULT_SETTINGS = { name: 'Blobby', color: '#FFB84D', voice: true, mood: 'happy', prompt: '' };
+        var settings;
+        try {
+          settings = Object.assign({}, DEFAULT_SETTINGS, JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}'));
+        } catch (e) {
+          settings = Object.assign({}, DEFAULT_SETTINGS);
+        }
+
+        var gl;
+        try {
+          if (!window.THREE) throw new Error('three missing');
+          gl = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        } catch (e) {
+          var p = document.createElement('p');
+          p.className = 'nogl';
+          p.textContent = 'This page needs WebGL to draw Blobby. Try another browser.';
+          stage.appendChild(p);
+          return;
+        }
+
+        var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        var motion = reduce ? 0.3 : 1;
+
+        gl.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+        stage.insertBefore(gl.domElement, bubble);
+
+        var scene = new THREE.Scene();
+        var camera = new THREE.PerspectiveCamera(35, 1, 0.1, 100);
+        scene.add(new THREE.HemisphereLight(0xffffff, 0x7f8db0, 0.95));
+        var sun = new THREE.DirectionalLight(0xffffff, 0.75);
+        sun.position.set(3, 5, 7);
+        scene.add(sun);
+
+        /* ---------- materials and helpers ---------- */
+        var skinMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(settings.color), roughness: 0.55 });
+        var whiteMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3 });
+        var inkMat = new THREE.MeshStandardMaterial({ color: 0x1b1f2e, roughness: 0.4 });
+        var hiMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        var mouthMat = new THREE.MeshStandardMaterial({ color: 0x5a1a2b, roughness: 0.6 });
+        var tongueMat = new THREE.MeshStandardMaterial({ color: 0xff7a93, roughness: 0.5 });
+        var blushMat = new THREE.MeshBasicMaterial({ color: 0xff5d7a, transparent: true, opacity: 0 });
+        var ballMat = new THREE.MeshStandardMaterial({ color: 0x3B82F6, emissive: 0x3B82F6, emissiveIntensity: 0.35, roughness: 0.3 });
+
+        function sph(r, mat, sx, sy, sz) {
+          var m = new THREE.Mesh(new THREE.SphereGeometry(r, 32, 20), mat);
+          m.scale.set(sx || 1, sy || 1, sz || 1);
+          return m;
+        }
+        function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+        function surfZ(x, y) {
+          var v = 1 - (x / 1.6) * (x / 1.6) - (y / 1.472) * (y / 1.472);
+          return 1.52 * Math.sqrt(Math.max(0.04, v));
+        }
+
+        /* ---------- the avatar ---------- */
+        var root = new THREE.Group();
+        root.position.y = -0.1;
+        scene.add(root);
+
+        var shadow = new THREE.Mesh(new THREE.CircleGeometry(1.5, 32), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.16 }));
+        shadow.rotation.x = -Math.PI / 2;
+        shadow.position.y = -2.7;
+        root.add(shadow);
+
+        var body = sph(1.05, skinMat, 1, 0.78, 0.8);
+        body.position.y = -1.85;
+        root.add(body);
+
+        var handL = sph(0.28, skinMat); handL.position.set(-1.2, -1.75, 0.35); root.add(handL);
+        var handR = sph(0.28, skinMat); handR.position.set(1.2, -1.75, 0.35); root.add(handR);
+
+        var head = new THREE.Group();
+        head.position.y = 0.5;
+        root.add(head);
+        head.add(sph(1, skinMat, 1.6, 1.472, 1.52));
+
+        var earL = sph(0.38, skinMat, 0.55, 1, 0.8); earL.position.set(-1.55, 0.1, 0); head.add(earL);
+        var earR = sph(0.38, skinMat, 0.55, 1, 0.8); earR.position.set(1.55, 0.1, 0); head.add(earR);
+
+        var ant = new THREE.Group();
+        ant.position.set(0, 1.38, 0);
+        head.add(ant);
+        var stalk = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, 0.7, 10), inkMat);
+        stalk.position.y = 0.35;
+        ant.add(stalk);
+        var ball = sph(0.17, ballMat);
+        ball.position.y = 0.8;
+        ant.add(ball);
+
+        function makeEye(x) {
+          var g = new THREE.Group();
+          g.position.set(x, 0.35, 1.28);
+          g.add(sph(0.36, whiteMat, 1, 1, 0.6));
+          var p = new THREE.Group();
+          p.position.z = 0.17;
+          p.add(sph(0.17, inkMat, 1, 1, 0.6));
+          var h = sph(0.045, hiMat, 1, 1, 0.6);
+          h.position.set(0.06, 0.07, 0.13);
+          p.add(h);
+          g.add(p);
+          head.add(g);
+          return { g: g, p: p };
+        }
+        var eyeL = makeEye(-0.55);
+        var eyeR = makeEye(0.55);
+
+        function makeBrow() {
+          var m = sph(1, inkMat, 0.3, 0.065, 0.07);
+          head.add(m);
+          return m;
+        }
+        var browL = makeBrow();
+        var browR = makeBrow();
+
+        function makeCheek(x) {
+          var m = new THREE.Mesh(new THREE.SphereGeometry(0.24, 20, 14), blushMat);
+          m.scale.set(1, 0.65, 0.2);
+          m.position.set(x, -0.25, 1.17);
+          m.rotation.y = x < 0 ? -0.55 : 0.55;
+          head.add(m);
+        }
+        makeCheek(-0.95);
+        makeCheek(0.95);
+
+        var mouth = new THREE.Group();
+        mouth.position.set(0, -0.55, 1.38);
+        head.add(mouth);
+        var mouthOpen = sph(0.5, mouthMat, 0.7, 0.1, 0.1);
+        mouth.add(mouthOpen);
+        var tongue = sph(1, tongueMat, 0.3, 0.1, 0.1);
+        mouth.add(tongue);
+        var lip = new THREE.Mesh(new THREE.BufferGeometry(), mouthMat);
+        mouth.add(lip);
+        var capL = sph(0.055, mouthMat); mouth.add(capL);
+        var capR = sph(0.055, mouthMat); mouth.add(capR);
+
+        var lastS = 99, lastHW = 99;
+        function rebuildLip(s, hw) {
+          var yE = s * 0.1, yC = -s * 0.55;
+          var curve = new THREE.QuadraticBezierCurve3(
+            new THREE.Vector3(-hw, yE, -0.07),
+            new THREE.Vector3(0, yC, 0.02),
+            new THREE.Vector3(hw, yE, -0.07)
+          );
+          var g = new THREE.TubeGeometry(curve, 18, 0.055, 8, false);
+          lip.geometry.dispose();
+          lip.geometry = g;
+          capL.position.set(-hw, yE, -0.07);
+          capR.position.set(hw, yE, -0.07);
+        }
+
+        /* ---------- moods ---------- */
+        var BASE = { smile: 0.15, open: 0, w: 0.55, lift: 0, angle: 0, eyeL: 1, eyeR: 1, blush: 0, tilt: 0, cross: 0, pupil: 1, tongue: 0, wave: 0 };
+        var RAW = {
+          neutral: {},
+          happy: { smile: 1, open: 0.3, w: 0.72, lift: 0.2, eyeL: 0.85, eyeR: 0.85, blush: 0.65, wave: 0.6 },
+          sad: { smile: -0.85, w: 0.45, lift: 0.1, angle: -0.5, eyeL: 0.85, eyeR: 0.85, tilt: 0.08, pupil: 1.15 },
+          angry: { smile: -0.5, open: 0.08, w: 0.6, lift: -0.3, angle: 0.65, eyeL: 0.78, eyeR: 0.78, blush: 0.25, pupil: 0.85 },
+          surprised: { smile: 0, open: 0.8, w: 0.4, lift: 1, eyeL: 1.12, eyeR: 1.12, pupil: 0.65 },
+          wink: { smile: 1, open: 0.2, w: 0.72, lift: 0.2, eyeR: 0.06, blush: 0.55, tilt: -0.07, wave: 1 },
+          sleepy: { smile: 0.1, open: 0.12, w: 0.5, lift: -0.4, eyeL: 0.28, eyeR: 0.28, tilt: 0.1 },
+          silly: { smile: 0.9, open: 0.45, w: 0.7, lift: 0.4, cross: 1, tongue: 1, blush: 0.4, tilt: -0.1, wave: 1 }
+        };
+        var BALL = { neutral: 0x3B82F6, happy: 0xFFD23F, sad: 0x4DA3FF, angry: 0xFF4D4D, surprised: 0xFF8AF0, wink: 0x7CFFB2, sleepy: 0x8A8FB0, silly: 0xFF9F43 };
+        var EM = {};
+        Object.keys(RAW).forEach(function (n) { EM[n] = Object.assign({}, BASE, RAW[n]); });
+
+        var mood = 'happy';
+        var override = null, overrideUntil = 0;
+        var cur = Object.assign({}, EM.happy);
+        var keys = Object.keys(BASE);
+        var mo = 0, mw = 0.55;
+        var ballTarget = new THREE.Color();
+
+        /* ---------- speech ---------- */
+        var speech = { on: false, text: '', t0: 0, started: false, useSynth: false, u: null, hide: 0, msPer: 68 };
+
+        function visemeFor(ch) {
+          switch (ch.toLowerCase()) {
+            case 'a': return [0.85, 0.62];
+            case 'e': return [0.5, 0.78];
+            case 'i': return [0.3, 0.8];
+            case 'o': return [0.7, 0.38];
+            case 'u': return [0.45, 0.3];
+            case 'm': case 'b': case 'p': return [0, 0.55];
+            case 'f': case 'v': return [0.12, 0.7];
+            case ' ': case ',': case '.': case '!': case '?': return [0.04, 0.5];
+            default: return [0.32, 0.58];
+          }
+        }
+        function endSpeech() {
+          speech.on = false;
+          speech.u = null;
+          clearTimeout(speech.hide);
+          speech.hide = setTimeout(function () { bubble.classList.remove('show'); }, 2200);
+          if (typeof speech.onEnd === 'function') {
+            var f = speech.onEnd;
+            speech.onEnd = null;
+            try { f(); } catch (e) { }
+          }
+        }
+        function stopSpeech() {
+          if (speech.u) {
+            speech.u = null;
+            try { window.speechSynthesis.cancel(); } catch (e) { }
+          }
+          speech.on = false;
+        }
+        function speak(text) {
+          text = (text || '').trim();
+          if (!text) return;
+          stopSpeech();
+          clearTimeout(speech.hide);
+          speech.on = true;
+          speech.text = text;
+          speech.t0 = performance.now();
+          speech.started = false;
+          speech.useSynth = false;
+          speech.onEnd = null;
+          bubble.textContent = text;
+          bubble.classList.add('show');
+          if (settings.voice && 'speechSynthesis' in window) {
+            try {
+              var u = new SpeechSynthesisUtterance(text);
+              u.rate = 1.03;
+              u.pitch = 1.3;
+              u.onstart = function () {
+                if (speech.u === u) { speech.started = true; speech.t0 = performance.now(); }
+              };
+              u.onend = u.onerror = function () { if (speech.u === u) endSpeech(); };
+              speech.u = u;
+              speech.useSynth = true;
+              window.speechSynthesis.cancel();
+              window.speechSynthesis.speak(u);
+            } catch (e) {
+              speech.useSynth = false;
+              speech.u = null;
+            }
+          }
+        }
+
+        /* ---------- input ---------- */
+        var gaze = { x: 0, y: 0 };
+        var gazeT = { x: 0, y: 0 };
+        var lastMove = -99999;
+        window.addEventListener('pointermove', function (e) {
+          var r = stage.getBoundingClientRect();
+          var cx = r.left + r.width / 2;
+          var cy = r.top + r.height * 0.4;
+          gazeT.x = clamp((e.clientX - cx) / (window.innerWidth * 0.5), -1, 1);
+          gazeT.y = clamp(-(e.clientY - cy) / (window.innerHeight * 0.5), -1, 1);
+          lastMove = performance.now();
+        });
+
+        var spring = { s: 0, v: 0 };
+        stage.addEventListener('pointerdown', function () {
+          spring.v += 7;
+          override = 'surprised';
+          overrideUntil = performance.now() + 700;
+        });
+
+        function setMood(n) {
+          mood = EM[n] ? n : 'neutral';
+        }
+
+        /* ---------- settings ---------- */
+        var modal = document.getElementById('settingsModal');
+        var setName = document.getElementById('setName');
+        var setColor = document.getElementById('setColor');
+        var setMoodSel = document.getElementById('setMood');
+        var setVoice = document.getElementById('setVoice');
+        var setPrompt = document.getElementById('setPrompt');
+
+        Object.keys(EM).forEach(function (n) {
+          var o = document.createElement('option');
+          o.value = n;
+          o.textContent = n.charAt(0).toUpperCase() + n.slice(1);
+          setMoodSel.appendChild(o);
+        });
+
+        function openSettings() {
+          setName.value = settings.name;
+          setColor.value = settings.color;
+          setMoodSel.value = EM[settings.mood] ? settings.mood : 'neutral';
+          setVoice.checked = settings.voice;
+          setPrompt.value = settings.prompt;
+          modal.hidden = false;
+          setName.focus();
+        }
+
+        function closeSettings() { modal.hidden = true; }
+
+        function applySettings() {
+          var name = (setName.value || '').trim() || 'Blobby';
+          settings = {
+            name: name,
+            color: setColor.value || '#FFB84D',
+            mood: setMoodSel.value,
+            voice: setVoice.checked,
+            prompt: setPrompt.value.trim()
+          };
+          try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (e) { }
+          document.getElementById('appName').textContent = name;
+          document.getElementById('chatTitle').textContent = 'Chat with ' + name;
+          stage.setAttribute('aria-label', name + ', a cartoon avatar. Tap to poke.');
+          skinMat.color.set(settings.color);
+          setMood(settings.mood);
+          closeSettings();
+        }
+
+        document.getElementById('settingsBtn').addEventListener('click', openSettings);
+        document.getElementById('editName').addEventListener('click', openSettings);
+        document.getElementById('settingsClose').addEventListener('click', closeSettings);
+        document.getElementById('settingsSave').addEventListener('click', applySettings);
+        document.getElementById('settingsReset').addEventListener('click', function () {
+          settings = Object.assign({}, DEFAULT_SETTINGS);
+          try { localStorage.removeItem(SETTINGS_KEY); } catch (e) { }
+          document.getElementById('appName').textContent = settings.name;
+          document.getElementById('chatTitle').textContent = 'Chat with ' + settings.name;
+          stage.setAttribute('aria-label', settings.name + ', a cartoon avatar. Tap to poke.');
+          skinMat.color.set(settings.color);
+          setMood(settings.mood);
+          closeSettings();
+        });
+        modal.addEventListener('click', function (e) { if (e.target === modal) closeSettings(); });
+        document.addEventListener('keydown', function (e) {
+          if (e.key === 'Escape' && !modal.hidden) closeSettings();
+        });
+
+        /* ---------- init from settings ---------- */
+        document.getElementById('appName').textContent = settings.name;
+        document.getElementById('chatTitle').textContent = 'Chat with ' + settings.name;
+        stage.setAttribute('aria-label', settings.name + ', a cartoon avatar. Tap to poke.');
+        setMood(settings.mood);
+        bubble.textContent = "Hi! I'm " + settings.name + ".";
+        bubble.classList.add('show');
+        speech.hide = setTimeout(function () { bubble.classList.remove('show'); }, 4000);
+
+        /* ---------- sizing ---------- */
+        function resize() {
+          var w = stage.clientWidth, h = stage.clientHeight;
+          if (!w || !h) return;
+          gl.setSize(w, h, false);
+          var ar = w / h;
+          camera.aspect = ar;
+          camera.position.set(0, 0, Math.max(10, 7.6 / ar));
+          camera.lookAt(0, 0, 0);
+          camera.updateProjectionMatrix();
+        }
+        if (window.ResizeObserver) new ResizeObserver(resize).observe(stage);
+        window.addEventListener('resize', resize);
+        resize();
+
+        /* ---------- animation ---------- */
+        var blink = { next: 2.5, p: -1 };
+        var last = performance.now();
+        var t = 0;
+
+        function update(dt, now) {
+          t += dt;
+
+          var em = (override && now < overrideUntil) ? EM[override] : EM[mood];
+          var k = 1 - Math.exp(-dt * 8);
+          keys.forEach(function (key) { cur[key] += (em[key] - cur[key]) * k; });
+
+          // gaze: follow the pointer, wander when it has been idle
+          if (now - lastMove > 3500) {
+            gazeT.x = Math.sin(t * 0.5) * 0.5;
+            gazeT.y = Math.sin(t * 0.37 + 1) * 0.25;
+          }
+          var gk = 1 - Math.exp(-dt * 10);
+          gaze.x += (gazeT.x - gaze.x) * gk;
+          gaze.y += (gazeT.y - gaze.y) * gk;
+
+          // speaking drives the mouth
+          var tOpen = cur.open, tW = cur.w, talking = false, elapsed = 0;
+          if (speech.on) {
+            if (speech.useSynth && !speech.started && now - speech.t0 > 1200) {
+              speech.useSynth = false;
+              speech.u = null;
+              try { window.speechSynthesis.cancel(); } catch (e) { }
+              speech.t0 = now;
+            }
+            if (!speech.useSynth || speech.started) {
+              elapsed = now - speech.t0;
+              var pos = elapsed / speech.msPer;
+              var len = speech.text.length;
+              var idx = Math.floor(pos);
+              if (!speech.useSynth && idx >= len) {
+                endSpeech();
+              } else if (speech.useSynth && elapsed > len * speech.msPer * 3 + 4000) {
+                stopSpeech();
+                endSpeech();
+              } else {
+                var v = visemeFor(speech.text.charAt(idx % len));
+                var frac = pos - Math.floor(pos);
+                tOpen = Math.max(cur.open * 0.4, v[0] * (0.6 + 0.4 * Math.sin(frac * Math.PI)));
+                tW = v[1];
+                talking = true;
+              }
+            }
+          }
+          var mk = 1 - Math.exp(-dt * (talking ? 26 : 10));
+          mo += (tOpen - mo) * mk;
+          mw += (tW - mw) * mk;
+
+          // blink
+          if (t > blink.next && blink.p < 0) blink.p = 0;
+          if (blink.p >= 0) {
+            blink.p += dt / 0.16;
+            if (blink.p >= 1) {
+              blink.p = -1;
+              blink.next = t + (Math.random() < 0.2 ? 0.25 : 2 + Math.random() * 3.5);
+            }
+          }
+          var bl = blink.p >= 0 ? Math.sin(blink.p * Math.PI) : 0;
+
+          // head
+          var pitch = -gaze.y * 0.22;
+          if (talking) pitch += Math.sin(now * 0.012) * 0.035 + mo * 0.05;
+          head.rotation.set(pitch, gaze.x * 0.38, cur.tilt - gaze.x * 0.04);
+          root.rotation.y = gaze.x * 0.1;
+          head.position.y = 0.5 + Math.sin(t * 1.6) * 0.035 * motion;
+          body.scale.y = 0.78 * (1 + Math.sin(t * 1.6) * 0.02 * motion);
+
+          // eyes
+          function setEye(e, open, crossDir) {
+            e.g.scale.set(open > 1 ? 1 + (open - 1) * 0.8 : 1, Math.max(0.06, open * (1 - bl * 0.95)), 1);
+            var amp = 1 - cur.cross * 0.8;
+            e.p.position.set(gaze.x * 0.13 * amp + crossDir * cur.cross * 0.14, gaze.y * 0.11 * amp, 0.17);
+            e.p.scale.setScalar(cur.pupil);
+          }
+          setEye(eyeL, cur.eyeL, 1);
+          setEye(eyeR, cur.eyeR, -1);
+
+          // brows
+          var by = 0.92 + cur.lift * 0.15;
+          var bz = surfZ(0.55, by) + 0.03;
+          browL.position.set(-0.55, by, bz);
+          browR.position.set(0.55, by, bz);
+          browL.rotation.set(0, -0.3, -cur.angle);
+          browR.rotation.set(0, 0.3, cur.angle);
+
+          blushMat.opacity = clamp(cur.blush, 0, 1) * 0.75;
+
+          // mouth
+          var hw = 0.22 + 0.4 * mw;
+          if (Math.abs(cur.smile - lastS) > 0.008 || Math.abs(hw - lastHW) > 0.008) {
+            rebuildLip(cur.smile, hw);
+            lastS = cur.smile;
+            lastHW = hw;
+          }
+          var lipMid = -0.225 * cur.smile;
+          var lipBottom = lipMid;
+          mouthOpen.visible = mo > 0.04;
+          if (mouthOpen.visible) {
+            mouthOpen.scale.set(hw * 1.8, mo, 0.1);
+            mouthOpen.position.y = lipMid - mo * 0.4;
+            lipBottom = lipMid - mo * 0.8;
+          }
+          tongue.visible = cur.tongue > 0.05;
+          if (tongue.visible) {
+            tongue.scale.set(0.28, 0.42 * cur.tongue, 0.1);
+            tongue.position.set(0.04, lipBottom - 0.28 * cur.tongue, -0.02);
+          }
+
+          // antenna and hands
+          ant.rotation.z = Math.sin(t * 2.1) * 0.12 * motion - gaze.x * 0.1;
+          ant.rotation.x = Math.cos(t * 1.7) * 0.08 * motion;
+          ballTarget.setHex(BALL[(override && now < overrideUntil) ? override : mood]);
+          ballMat.color.lerp(ballTarget, k);
+          ballMat.emissive.copy(ballMat.color);
+          handR.position.set(1.2 + cur.wave * 0.25, -1.75 + cur.wave * (0.9 + 0.25 * Math.sin(t * 9) * motion), 0.35);
+          handL.position.set(-1.2, -1.75 + Math.sin(t * 1.6 + 1) * 0.04 * motion, 0.35);
+
+          // poke spring
+          spring.v += (-90 * spring.s - 7 * spring.v) * dt;
+          spring.s += spring.v * dt;
+          root.scale.set(1 - spring.s * 0.06, 1 + spring.s * 0.1, 1 - spring.s * 0.06);
+          root.position.y = -0.1 + spring.s * 0.15;
+          shadow.scale.setScalar(1 - spring.s * 0.08);
+        }
+
+        function frame(now) {
+          requestAnimationFrame(frame);
+          var dt = Math.min(0.05, (now - last) / 1000);
+          last = now;
+          update(dt, now);
+          gl.render(scene, camera);
+        }
+        requestAnimationFrame(frame);
+
+        window.Blobby = {
+          speak: speak,
+          setMood: setMood,
+          onSpeakEnd: function (fn) { speech.onEnd = fn; }
+        };
+      })();
+    </script>
+    <script src="chat.js"></script>
+
+  </body>
+
+</html>

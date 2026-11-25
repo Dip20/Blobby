@@ -5,6 +5,13 @@ Blobby is a cute, expressive 3D blob AI companion. It lives in your browser as a
 ![Node](https://img.shields.io/badge/node-%3E%3D18-brightgreen)
 ![License: MIT](https://img.shields.io/badge/license-MIT-blue)
 
+## Screenshots
+
+| | |
+| --- | --- |
+| ![Blobby avatar and chat](screenshots/screenshot-1.png) | ![Blobby avatar and chat](screenshots/screenshot-2.png) |
+| ![Blobby avatar and chat](screenshots/screenshot-3.png) | ![Blobby avatar and chat](screenshots/screenshot-4.png) |
+
 ## Features
 
 - **3D animated avatar** — a soft, squishy blob rendered with Three.js that follows your cursor, blinks, wiggles, and pokes back when clicked.

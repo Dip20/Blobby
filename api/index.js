@@ -1,1 +1,7 @@
-export { default } from '../src/app.js';
+import app from '../src/app.js';
+
+export const config = {
+  runtime: 'nodejs',
+};
+
+export default app;
